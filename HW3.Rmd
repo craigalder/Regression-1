@@ -1,7 +1,7 @@
 ---
 title: "HW3"
-author: "Vicki Hertzberg"
-date: "February 8, 2017"
+author: "Craig Alder"
+date: "February 15, 2017"
 output: html_document
 ---
 
@@ -22,3 +22,219 @@ Exploration (summary statistics (the m's), univariate graphs, multivariate graph
 Regression (Models explored, diagnostics completed, final model choice, justification)
 
 Please include a concluding paragraph (or two) about the implications of your findings.
+
+```{r}
+#load up necessary packages
+library(HistData)
+library(car)
+library(stargazer)
+```
+
+```{r}
+#read in dataset
+library(readr)
+White_wines <- read_csv("~/Documents/Big Data Class/N741 Data Wrangling/InClass2.1/Regression-1/White_wines.csv")
+
+#Why did I have to do below?
+names(White_wines) <- make.names(names(White_wines))
+```
+
+```{r}
+# see what is in the dataset
+summary(White_wines)
+```
+
+```{r}
+library(Rcmdr)
+```
+
+
+```{r}
+# divide the dataset into a training and a testing set based on a random uniform number on fixed seed
+set.seed(02132017)
+White_wines$group <- runif(length(White_wines$pH), min = 0, max = 1)
+summary(White_wines)
+White_wines.train <- subset(White_wines, group <= 0.90)
+White_wines.test <- subset(White_wines, group > 0.90)
+
+```
+
+
+```{r}
+scatterplotMatrix(~quality+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
+   reg.line=FALSE, smooth=TRUE, spread=FALSE, span=0.5, ellipse=FALSE, 
+  levels=c(.5, .9), id.n=0, diagonal = 'histogram', data=White_wines.train)
+
+scatterplotMatrix(~quality+pH+density+free.sulfur.dioxide+chlorides,
+   reg.line=FALSE, smooth=TRUE, spread=FALSE, span=0.5, ellipse=FALSE, 
+  levels=c(.5, .9), id.n=0, diagonal = 'histogram', data=White_wines.train)
+
+scatterplotMatrix(~quality+citric.acid+fixed.acidity+alcohol,
+   reg.line=FALSE, smooth=TRUE, spread=FALSE, span=0.5, ellipse=FALSE, 
+  levels=c(.5, .9), id.n=0, diagonal = 'histogram', data=White_wines.train)
+```
+
+Free sulfur dioxide, fixed acidity, and density seem to have abnormal residual distributions, so I logged them below.
+
+```{r}
+White_wines.train$free.sulf.diox.log <- with(White_wines.train, 
+  log2(free.sulfur.dioxide))
+```
+
+```{r}
+White_wines.train$fixed.acidity.log <- with(White_wines.train, log2(fixed.acidity))
+```
+
+```{r}
+White_wines.train$density.log <- with(White_wines.train, log2(density))
+```
+
+```{r}
+scatterplotMatrix(~quality+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
+   reg.line=FALSE, smooth=TRUE, spread=FALSE, span=0.5, ellipse=FALSE, 
+  levels=c(.5, .9), id.n=0, diagonal = 'histogram', data=White_wines.train)
+
+scatterplotMatrix(~quality+pH+density.log+free.sulf.diox.log+chlorides,
+   reg.line=FALSE, smooth=TRUE, spread=FALSE, span=0.5, ellipse=FALSE, 
+  levels=c(.5, .9), id.n=0, diagonal = 'histogram', data=White_wines.train)
+
+scatterplotMatrix(~quality+citric.acid+fixed.acidity.log+alcohol,
+   reg.line=FALSE, smooth=TRUE, spread=FALSE, span=0.5, ellipse=FALSE, 
+  levels=c(.5, .9), id.n=0, diagonal = 'histogram', data=White_wines.train)
+```
+
+Those transformations help a little bit.
+
+```{r}
+cor(White_wines.train[,c("quality","alcohol","chlorides","citric.acid","density.log","fixed.acidity.log","free.sulf.diox.log","pH","residual.sugar","sulphates","total.sulfur.dioxide","volatile.acidity")], use="complete")
+```
+The variable most correlated with quality is alcohol, so I will use that as my primary independent variable. Density is highly correlated with alcohol (r=-.78) and residual sugar (r=.84),and free sulfur dioxide less so with total sulfur dioxide (r=.59), so I will consider whether these variables all need to be in the model.
+
+
+Regression with training data.
+
+```{r}
+RegModel.1 <- 
+  lm(quality~alcohol+chlorides+citric.acid+density.log+fixed.acidity.log+free.sulf.diox.log+pH+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
+   data=White_wines.train)
+summary(RegModel.1)
+```
+**Interpretation:**
+Density standard error is very high.
+
+```{r}
+RegModel.1.2 <- 
+  lm(quality~alcohol+chlorides+citric.acid+density+fixed.acidity+free.sulfur.dioxide+pH+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
+   data=White_wines.train)
+summary(RegModel.1.2)
+```
+
+The logged variables seem to matter.
+
+```{r}
+RegModel.2 <- 
+  lm(quality~alcohol+chlorides+citric.acid+fixed.acidity.log+free.sulf.diox.log+pH+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
+   data=White_wines.train)
+summary(RegModel.2)
+```
+**Interpretation:** for each increase in parent height of 1 inch, the child height increases by 0.65 inches.
+With density dropped, there are no anomolous standard errors. R-squared decreases slightly, but not enough to be practically significant.
+
+
+```{r}
+RegModel.3 <- 
+  lm(quality~alcohol+chlorides+fixed.acidity.log+free.sulf.diox.log+pH+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
+   data=White_wines.train)
+summary(RegModel.3)
+```
+
+Let's see what happens without density and then citric acid.
+
+```{r results="asis"}
+# compare the results of the two regression models
+stargazer(RegModel.1,RegModel.2,RegModel.3,title="Comparison of 2 Regression outputs",type="html",align=TRUE)
+```
+
+```{r}
+# diagnostics using residual plots
+residualPlots(RegModel.1)
+residualPlots(RegModel.2)
+residualPlots(RegModel.3)
+```
+
+```{r}
+White_wines.train$tot.sulf.diox.log <- with(White_wines.train, 
+  log2(total.sulfur.dioxide))
+```
+
+```{r}
+RegModel.4 <- 
+  lm(quality~alcohol+chlorides+fixed.acidity.log+free.sulf.diox.log+pH+residual.sugar+sulphates+tot.sulf.diox.log+volatile.acidity,
+   data=White_wines.train)
+summary(RegModel.4)
+
+residualPlots(RegModel.4)
+```
+
+```{r}
+RegModel.5 <- 
+  lm(quality~alcohol+chlorides+fixed.acidity.log+pH+residual.sugar+sulphates+volatile.acidity,
+   data=White_wines.train)
+summary(RegModel.5)
+
+residualPlots(RegModel.5)
+```
+
+Lose too much R-squared. Stick with 4
+
+```{r}
+
+#added variable plots
+avPlots(RegModel.4, id.n=3, id.cex=0.7)
+#id.n - identify n most influential observations
+#id.cex - controls the size of the dot
+```
+
+```{r}
+
+# run the qq-plot
+qqPlot(RegModel.4, id.n=3)
+# here, id.n identifies the n observations with the largest residuals in absolute value
+```
+
+Are there any outliers?
+
+```{r}
+ 
+#run Bonferroni test for outliers
+outlierTest(RegModel.4)
+```
+
+Are there any points that are of high influence?
+
+```{r}
+
+#identify highly influential points
+influenceIndexPlot(RegModel.4, id.n=3)
+```
+
+NB. If there are points that are a) outliers AND b) highly influential, these have potential to change the inference. You should consider removing them.
+
+How do we make heads or tails out of the plots above? One way is with an influence plot.
+```{r}
+#make influence plot
+influencePlot(RegModel.4, id.n=3)
+```
+
+Another diagnostic is to test for heteroskedasticity (i.e., the variance of the error term is not constant).
+
+```{r}
+#test for heteroskedasticity
+ncvTest(RegModel.4)
+```
+
+We also want to look for multicollinearity, that is are some of our independent variables highly correlated. We do this by looking at the Variance Inflation Factor (VIF). A GVIF > 4 suggests collinearity.
+
+```{r}
+vif(RegModel.4)
+```
