@@ -1,36 +1,27 @@
 ---
-title: "HW3"
+title: "Wining and Data-ing"
 author: "Craig Alder"
 date: "February 15, 2017"
 output: html_document
 ---
 
+Note: To view output with code, go to [this page](http://rpubs.com/craigalder/hw3code) on Rpubs.
+
+# Background
+Principal investigator Dr. Vinca Monster of the Grape Program at State U needs me, a poor graduate student, to help her understand influences of physico-chemical properties on wine preferences. Her laboratory has gathered an extensive dataset on Portugese white varietals.
+
+This report uses exploratory data analysis and linear regression to determine associations of wine properties on preference. 
 
 
-You are now the data slave to the principal investigator Dr. Vinca Monster. Dr. M is in the Grape Program at State U, and you are just a poor graduate student trying to get your degree. Dr. M is interested in wine preferences and the influences of physico-chemical properties on preferences. Her laboratory has gathered an extensive dataset on Portugese white varietals.
 
-
-You will find the white_wines.csv file and its description in my github repo (https://github.com/vhertzb/Regression-1)[https://github.com/vhertzb/Regression-1].
-
-Please use the techniques you have learned in the last two classes, specifically exploratory data analysis and linear regression, to determine association of the wine properties on preference. 
-
-Prepare a report for presentation at the next Monster lab meeting about this dataset.
-
-Rubric:
-
-Exploration (summary statistics (the m's), univariate graphs, multivariate graphs)
-Regression (Models explored, diagnostics completed, final model choice, justification)
-
-Please include a concluding paragraph (or two) about the implications of your findings.
-
-```{r}
+```{r echo=FALSE}
 #load up necessary packages
 library(HistData)
 library(car)
 library(stargazer)
 ```
 
-```{r}
+```{r echo=FALSE}
 #read in dataset
 library(readr)
 White_wines <- read_csv("~/Documents/Big Data Class/N741 Data Wrangling/InClass2.1/Regression-1/White_wines.csv")
@@ -39,13 +30,16 @@ White_wines <- read_csv("~/Documents/Big Data Class/N741 Data Wrangling/InClass2
 names(White_wines) <- make.names(names(White_wines))
 ```
 
-```{r}
+## Exploration
+### Summary Statistics
+```{r echo=FALSE}
 # see what is in the dataset
 summary(White_wines)
 ```
-It doesn't seem as if there is any unaccounted missing data unaccounted.
+It doesn't seem as if there is any unaccounted missing data.
 
-```{r}
+### Graphs
+```{r echo=FALSE}
 scatterplotMatrix(~quality+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
    reg.line=FALSE, smooth=TRUE, spread=FALSE, span=0.5, ellipse=FALSE, 
   levels=c(.5, .9), id.n=0, diagonal = 'histogram', data=White_wines)
@@ -58,23 +52,23 @@ scatterplotMatrix(~quality+citric.acid+fixed.acidity+alcohol,
    reg.line=FALSE, smooth=TRUE, spread=FALSE, span=0.5, ellipse=FALSE, 
   levels=c(.5, .9), id.n=0, diagonal = 'histogram', data=White_wines)
 ```
+Density, fixed acidity, and free sulfur dioxide seem like candidates to be logged in order to help with distribution (their slopes are definitely not zero).
 
-Free sulfur dioxide, fixed acidity, and density seem to have abnormal residual distributions, so I logged them below.
-
-```{r}
+```{r echo=FALSE}
 White_wines$free.sulf.diox.log <- with(White_wines, 
   log2(free.sulfur.dioxide))
 ```
 
-```{r}
+```{r echo=FALSE}
 White_wines$fixed.acidity.log <- with(White_wines, log2(fixed.acidity))
 ```
 
-```{r}
+```{r echo=FALSE}
 White_wines$density.log <- with(White_wines, log2(density))
 ```
 
-```{r}
+Now I'll try the logged variables.
+```{r echo=FALSE}
 scatterplotMatrix(~quality+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
    reg.line=FALSE, smooth=TRUE, spread=FALSE, span=0.5, ellipse=FALSE, 
   levels=c(.5, .9), id.n=0, diagonal = 'histogram', data=White_wines)
@@ -87,17 +81,18 @@ scatterplotMatrix(~quality+citric.acid+fixed.acidity.log+alcohol,
    reg.line=FALSE, smooth=TRUE, spread=FALSE, span=0.5, ellipse=FALSE, 
   levels=c(.5, .9), id.n=0, diagonal = 'histogram', data=White_wines)
 ```
-
 Those transformations don't seem to help much visually, but I will try my model with and without them logged to check.
 
-```{r}
+Finally, I just want to check correlations to develop a better idea of what I'm putting into my model.
+```{r echo=FALSE}
 cor(White_wines[,c("quality","alcohol","chlorides","citric.acid","density.log","fixed.acidity.log","free.sulf.diox.log","pH","residual.sugar","sulphates","total.sulfur.dioxide","volatile.acidity")], use="complete")
 ```
-The variable most correlated with quality is alcohol, so I will use that as my primary independent variable. Density is highly correlated with alcohol (r=-.78) and residual sugar (r=.84),and free sulfur dioxide less so with total sulfur dioxide (r=.59), so I will consider whether these variables all need to be in the model.
+The variable most correlated with quality is alcohol, so I will use that as my primary independent variable. Density is highly correlated with alcohol (r=-.78) and residual sugar (r=.84),and free sulfur dioxide less so with total sulfur dioxide (r=.59), so there may be some collinearity isues there.
 
-
+## Regression
+### Exploring Models
 Below is my first regression, with all potential independent variables included.
-```{r}
+```{r echo=FALSE}
 RegModel.1 <- 
   lm(quality~alcohol+chlorides+citric.acid+density.log+fixed.acidity.log+free.sulf.diox.log+pH+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
    data=White_wines)
@@ -108,7 +103,7 @@ For each 1-unit increase in alcohol (I am guessing 1 percent alcohol content), t
 
 This interpretation could be extended to any of the other independent variables. For example, a 1 unit increase of chlorides is associated with a .404 decrease in rating of wine quality, all other independent variables held constant; however, the p-value, .65, is not significant.
 
-```{r}
+```{r echo=FALSE}
 RegModel.1.2 <- 
   lm(quality~alcohol+chlorides+citric.acid+density+fixed.acidity+free.sulfur.dioxide+pH+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
    data=White_wines)
@@ -116,7 +111,7 @@ summary(RegModel.1.2)
 ```
 This is the same model without density, fixed acidity, and free sulfur dioxide logged. The R-squared is noticeably reduced by about .02, so I'll keep those variables logged.
 
-```{r}
+```{r echo=FALSE}
 RegModel.2 <- 
   lm(quality~alcohol+density.log+fixed.acidity.log+free.sulf.diox.log+pH+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
    data=White_wines)
@@ -124,33 +119,33 @@ summary(RegModel.2)
 ```
 
 Below, I try model 1 without density, recalling that density is highly correlated with two other variables and has a high standard error in the previous models.
-```{r}
+```{r echo=FALSE}
 RegModel.3 <- 
   lm(quality~alcohol+fixed.acidity.log+free.sulf.diox.log+pH+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
    data=White_wines)
 summary(RegModel.3)
 ```
 **Interpretation:**
-With density dropped, there are no anomolous standard errors. R-squared decreases slightly, but not enough to be practically significant.
+With density dropped, there are no anomolous standard errors. R-squared decreases slightly, but not enough to be practically significant. This seems like a good candidate for the final model, but I'll do diagnostics below.
 
-```{r results="asis"}
-# compare the results of the two regression models
+###diagnostics
+```{r echo=FALSE, results="asis"}
+# compare the results of the regression models
 stargazer(RegModel.1,RegModel.2,RegModel.3,title="Comparison of 3 Regression outputs",type="html",align=TRUE)
 ```
 
-```{r}
+```{r echo=FALSE}
 # diagnostics using residual plots
 residualPlots(RegModel.1)
 residualPlots(RegModel.2)
 residualPlots(RegModel.3)
 ```
+This shows model 3 as a good fit. Without reducing R-squared much, it seems clear the model can do without density and citric acid. All the other independent variables stay statistically significant.
 
-```{r}
-White_wines$tot.sulf.diox.log <- with(White_wines, 
-  log2(total.sulfur.dioxide))
-```
+Are their any influential outliers?
 
-```{r}
+Below identifies influential observations.
+```{r echo=FALSE}
 
 #added variable plots
 avPlots(RegModel.3, id.n=3, id.cex=0.7)
@@ -158,24 +153,23 @@ avPlots(RegModel.3, id.n=3, id.cex=0.7)
 #id.cex - controls the size of the dot
 ```
 
-```{r}
+Below identifies observations with large residuals.
+```{r echo=FALSE}
 
 # run the qq-plot
 qqPlot(RegModel.3, id.n=3)
 # here, id.n identifies the n observations with the largest residuals in absolute value
 ```
 
-Are there any outliers?
-
-```{r}
+Below identifies outliers.
+```{r echo=FALSE}
  
 #run Bonferroni test for outliers
 outlierTest(RegModel.3)
 ```
 
-Are there any points that are of high influence?
-
-```{r}
+Below determines whether any points are highly influential.
+```{r echo=FALSE}
 
 #identify highly influential points
 influenceIndexPlot(RegModel.3, id.n=3)
@@ -183,21 +177,53 @@ influenceIndexPlot(RegModel.3, id.n=3)
 
 NB. If there are points that are a) outliers AND b) highly influential, these have potential to change the inference. You should consider removing them.
 
-How do we make heads or tails out of the plots above? One way is with an influence plot.
-```{r}
+To make sense of the plots above, I create an influence plot. Residuals of +/-2 can be problematic.
+```{r echo=FALSE}
 #make influence plot
 influencePlot(RegModel.3, id.n=3)
 ```
+It looks like there are 5 cases that may be problematic, cases 741, 775, 3308, 3902, and 4746.
 
 Another diagnostic is to test for heteroskedasticity (i.e., the variance of the error term is not constant).
 
-```{r}
+```{r echo=FALSE}
 #test for heteroskedasticity
 ncvTest(RegModel.3)
+```
+It does appear there is significant heteroscedasticity in the model.
+
+Below, I try dropping cases 741, 775, 3308, 3902, and 4746, then run an influence plot and test for heteroscedasticity again.
+
+```{r echo=FALSE}
+Wwines_dropouts <- White_wines[-c(741,775,3308,3902,4746),]
 ```
 
 We also want to look for multicollinearity, that is are some of our independent variables highly correlated. We do this by looking at the Variance Inflation Factor (VIF). A GVIF > 4 suggests collinearity.
 
-```{r}
-vif(RegModel.3)
+```{r echo=FALSE}
+#Rerun model with dropped variables
+RegModel.4 <- 
+  lm(quality~alcohol+fixed.acidity.log+free.sulf.diox.log+pH+residual.sugar+sulphates+total.sulfur.dioxide+volatile.acidity,
+   data=Wwines_dropouts)
+summary(RegModel.4)
+
+#make influence plot
+influencePlot(RegModel.4, id.n=3)
+
+#test for heteroskedasticity
+ncvTest(RegModel.4)
+
 ```
+At this point, I have logged some of the variables, dropped two variables without reducing R-squared much, compared 3 models, and dropped a few cases to reduce heteroscedasticity. Unfortunately, there still appears to be some cases skewing the data. At this point, unless there are multicollinearity issues, I think I will take my model to Dr. Monster to consult on further methods for manipulating the data and adjusting the model appropriately. 
+
+But first, I check on multicollinearity.
+```{r echo=FALSE}
+#check for multicollinearity
+vif(RegModel.4)
+```
+No variables seem to be causing any problems.
+
+# Conclusion
+Controlling for the other independent variables, a 1-unit increase in alcohol is associated with a .36 increase in white wine ratings, statistically significant at p<.001 in the final model. To optimize ratings, adjusting the alcohol level higher seems like a good recommendation. Additionally, lower fixed acidity, higher free sulfur dioxides, a higher pH level, more residual sugars, higher sulphate levels, less total sulfur dioxide, and less volatile acidity all would likely contribute to higher ratings as they are statistically significant predictors. Theoretically, I would imagine wine qualities to hit saturation points where increasing or decreasing certain qualities will no longer have a positive outcome on wine ratings. I might discuss with Dr. Monster the possibility of a nonlinear model producing a better fit, or some other method for determining thresholds.
+
+The link to my Github account is [https://github.com/craigalder](https://github.com/craigalder). The link to my repository for this assignment is [https://github.com/craigalder/N741gapminder1.git](https://github.com/craigalder/Regression-1).
